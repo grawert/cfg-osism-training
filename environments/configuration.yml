@@ -1,0 +1,81 @@
+---
+##########################
+# docker
+
+docker_version: "5:20.10.12"
+
+docker_user: "{{ operator_user }}"
+
+# docker_configure_insecure_registries: true
+# docker_insecure_registries:
+#   - quay.io
+ceph_docker_registry: quay.io
+docker_registry: index.docker.io
+docker_registry_ansible: quay.io
+docker_registry_service: quay.io
+
+##########################
+# operator
+
+operator_user: dragon
+
+# yamllint disable rule:line-length
+operator_public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDTqO38H+f2LG5IGMJ/JsgFbj8S0298+7su7BkeYtmUSmg/OFX+hCOBVu3/012jYIl2u2rx7fBwlt6ba0yEd6jrszpzPlBlVgoNq7hOZIbbEjxIryeuzo3syPjXGMAJOPhs58zu6hrpJIAiKe8xkGwUJ2lOfL3LooS6E9eINldLwz/yOUX3agxKpGr1XB7609rcwpLmCtb1HHkAJYmHEMsbCVouI/mez2oVbZU7ZPwsTUAeKh5ppVAb2hdQ5XXuprH6YzZj6c1EoTNSB0b/L8UWSizTrNtVhcRl9TcGagtEuTozhbc0uK2e+Hci2TnvMb6vRI6tiuDWOyDVhsTWMZdqO2zoVcqyNi0u3wXdqzDpHuARPHYW6OspF4tWKYOkf0StDagQ2622zTo2JeRQvBY1Y3jQafngcdf6Tpft2kZEHT57k67iLIv5WO+g10WyuRTLY+AmifIz+6IARHvuRfxfd1VT1uP2eVyXqaGlVpwrqCtZABA/3DSk9ZTh4Rlj1wFVu5IeLYhTRXftnrll/7GEDtrb8eghrL+hlS6TZWXyaDjKwjh0gigQ8WD1GGEAHD5BrygL/q0fUXsIrKX9N1MU2fRulfprwLNkub2rVeycSq/77RaYf+zd76jMZaYAoNRLNmMX6RFqirwqK5JyRuSkqn/Ebte97bcL07udiQU/6Q==
+# yamllint enable rule:line-length
+
+operator_authorized_keys:
+  - "{{ operator_public_key }}"
+
+##########################
+# resolvconf
+
+resolvconf_nameserver:
+  - 10.105.1.2
+  - 10.105.1.3
+resolvconf_search: osism.training
+
+##########################
+# hosts
+
+hosts_type: template
+hosts_additional_entries:
+  api-int.osism.training: 10.105.1.10
+  api.osism.training: 10.105.2.10
+
+##########################
+# common
+
+cleanup_services_extra:
+  - NetworkManager
+  - iscsid
+  - lxcfs
+  - nscd
+  - ntp
+
+##########################
+# kolla
+
+kolla_internal_vip_address: 10.105.1.10
+kolla_external_vip_address: 10.105.2.10
+
+##########################
+# serial
+
+osism_serial_default: 100%
+osism_serial:
+  docker: 1
+
+##########################
+# chrony
+
+chrony_servers:
+  - de.pool.ntp.org
+chrony_allowed_subnets:
+  - 127.0.0.1/32
+
+##########################
+# ceph
+
+ceph_share_directory: /share
+ceph_cluster_fsid: f3535b3c-ccc9-4f76-8870-419e542e3f79
+configuration_git_public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDW001x6PTcbNLIw39+eRVRXCBbRJTZbV3hkegzGtRl5rtlUX2oIY+WAOp0gaOTW7koWW7IAJxW8cLXD33ZGTYnI6W2uYNQdfqFopWc4OXouJAIcp7gmXDs9OMPaTgis64Xf4yGlol3wYN+rHK+ZknHShBIdIFWicYzYy7ncm0TuxI8EEheQS2ztPQ6hkfVH4X8EYeG0yQpvs8vX3QoQaQc/g2dA+JR7IDPatY+GMCiCpOcG/qKf3Onj3gBUtcJ7Stz83o5Zv5i//UNDP8DJKIwN0lShRr3jGkvvDiUWGKxfj/5IqO1S/tDYzk7zolTBnDFqvo2Huf19IUtD09GzwkFv5o+PgMUMn2lw7MoUahS7/uoIz3525yalXqKSZWptd5dO2nOD+AWuIbWkphFWOX0GIamdHzuCg//SSaq6DympSXX8KYVLvvE4atRCtSL7lhTl7gI15Z5Hk6Jg3scsE72o3ovaXBvE6fTBjhEMFGHUDL1WshK4rV63TKPfHWOLI33c76iMJHqMch9xpooNSPFMmFuoMDNKg7wNIU6AuS2l4wBShghX7lwp8VeWUy0mGVQJVenXOHrxUsfUZmMpHImpOwyJIHx88TNqx637hMIxaPb/8eFQOyC5SQEKT7NCC74u3aZyoYKbIjVGWBfwagtjty2mJhueWGnO7u7sQ7HqQ==

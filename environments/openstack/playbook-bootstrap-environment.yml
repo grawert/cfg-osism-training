@@ -1,0 +1,497 @@
+---
+- name: Bootstrap basic OpenStack resources
+  hosts: localhost
+  connection: local
+  vars:
+    external_mtu: 1400
+    external_gateway: 10.105.3.254
+    external_subnet: 10.105.3.0/24
+    external_address_pool_start: 10.105.3.100
+    external_address_pool_end: 10.105.3.200
+    octavia_subnet: 10.250.0.0/16
+    octavia_address_pool_start: 10.250.1.1
+    octavia_address_pool_end: 10.250.255.254
+
+  tasks:
+    - name: Include environments/kolla/secrets.yml
+      include_vars:
+        file: /opt/configuration/environments/kolla/secrets.yml
+
+    - name: Create external provider network
+      openstack.cloud.network:
+        cloud: admin
+        name: external
+        external: true
+        provider_network_type: flat
+        provider_physical_network: physnet1
+        mtu_size: "{{ external_mtu }}"
+      tags:
+        - external_network
+
+    - name: Create external subnet
+      openstack.cloud.subnet:
+        cloud: admin
+        name: external
+        network_name: external
+        cidr: "{{ external_subnet }}"
+        enable_dhcp: false
+        allocation_pool_start: "{{ external_address_pool_start }}"
+        allocation_pool_end: "{{ external_address_pool_end }}"
+        gateway_ip: "{{ external_gateway }}"
+      tags:
+        - external_network
+
+    - name: Create Octavia project
+      openstack.cloud.project:
+        cloud: admin
+        name: octavia
+        domain_id: default
+        description: "Octavia Loadbalancer Service Project"
+      tags:
+        - octavia
+
+    - name: Create Octavia user
+      openstack.cloud.identity_user:
+        cloud: admin
+        name: octavia
+        domain: default
+        default_project: octavia
+        password: "{{ octavia_keystone_password }}"
+      no_log: true
+      tags:
+        - octavia
+
+    - name: Make octavia user an admin in octavia project
+      openstack.cloud.role_assignment:
+        cloud: admin
+        user: octavia
+        role: admin
+        project: octavia
+      tags:
+        - octavia
+
+    - name: Make admin user an admin in octavia project
+      openstack.cloud.role_assignment:
+        cloud: admin
+        user: admin
+        role: admin
+        project: octavia
+      tags:
+        - octavia
+
+    - name: Create Octavia management network
+      openstack.cloud.network:
+        cloud: octavia
+        name: lb-mgmt
+      tags:
+        - octavia
+
+    - name: Create Octavia management subnet
+      openstack.cloud.subnet:
+        cloud: octavia
+        name: lb-mgmt
+        network_name: lb-mgmt
+        cidr: "{{ octavia_subnet }}"
+        allocation_pool_start: "{{ octavia_address_pool_start }}"
+        allocation_pool_end: "{{ octavia_address_pool_end }}"
+      register: result_octavia_subnet
+      tags:
+        - octavia
+
+    - name: Create lb-mgmt-sec-grp security group
+      openstack.cloud.security_group:
+        cloud: octavia
+        name: lb-mgmt-sec-grp
+      tags:
+        - octavia
+
+    - name: Add ssh rule to lb-mgmt-sec-grp security group
+      openstack.cloud.security_group_rule:
+        cloud: octavia
+        security_group: lb-mgmt-sec-grp
+        protocol: tcp
+        port_range_min: 22
+        port_range_max: 22
+        remote_ip_prefix: 0.0.0.0/0
+      tags:
+        - octavia
+
+    - name: Add amphora-agent rule to lb-mgmt-sec-grp security group
+      openstack.cloud.security_group_rule:
+        cloud: octavia
+        security_group: lb-mgmt-sec-grp
+        protocol: tcp
+        port_range_min: 9443
+        port_range_max: 9443
+        remote_ip_prefix: 0.0.0.0/0
+      tags:
+        - octavia
+
+    - name: Create lb-health-mgr-sec-grp security group
+      openstack.cloud.security_group:
+        cloud: octavia
+        name: lb-health-mgr-sec-grp
+      tags:
+        - octavia
+
+    - name: Add health-manager rule to lb-health-mgr-sec-grp security group
+      openstack.cloud.security_group_rule:
+        cloud: octavia
+        security_group: lb-health-mgr-sec-grp
+        protocol: udp
+        port_range_min: 5555
+        port_range_max: 5555
+        remote_ip_prefix: 0.0.0.0/0
+      tags:
+        - octavia
+
+    - name: Create health manager access port for ops01
+      openstack.cloud.port:
+        cloud: octavia
+        device_owner: octavia:health-mgr
+        fixed_ips:
+          - ip_address: 10.250.0.11
+            subnet_id: "{{ result_octavia_subnet.subnet.id }}"
+        name: lb-mgmt-ops01
+        network: lb-mgmt
+        security_groups:
+          - lb-health-mgr-sec-grp
+      tags:
+        - octavia
+
+    - name: Set binding host and mac for port lb-mgmt-ops01
+      command: >
+        openstack --os-cloud octavia port set lb-mgmt-ops01
+         --mac-address fa:16:00:25:00:11
+         --host ops01
+      tags:
+        - octavia
+
+    - name: Create health manager access port for ops02
+      openstack.cloud.port:
+        cloud: octavia
+        device_owner: octavia:health-mgr
+        fixed_ips:
+          - ip_address: 10.250.0.12
+            subnet_id: "{{ result_octavia_subnet.subnet.id }}"
+        name: lb-mgmt-ops02
+        network: lb-mgmt
+        security_groups:
+          - lb-health-mgr-sec-grp
+      tags:
+        - octavia
+
+    - name: Set binding host and mac for port lb-mgmt-ops02
+      command: >
+        openstack --os-cloud octavia port set lb-mgmt-ops02
+         --mac-address fa:16:00:25:00:12
+         --host ops02
+      tags:
+        - octavia
+
+    - name: Create health manager access port for ops03
+      openstack.cloud.port:
+        cloud: octavia
+        device_owner: octavia:health-mgr
+        fixed_ips:
+          - ip_address: 10.250.0.13
+            subnet_id: "{{ result_octavia_subnet.subnet.id }}"
+        name: lb-mgmt-ops03
+        network: lb-mgmt
+        security_groups:
+          - lb-health-mgr-sec-grp
+      tags:
+        - octavia
+
+    - name: Set binding host and mac for port lb-mgmt-ops03
+      command: >
+        openstack --os-cloud octavia port set lb-mgmt-ops03
+         --mac-address fa:16:00:25:00:13
+         --host ops03
+      tags:
+        - octavia
+
+    # NOTE: this role is required by Octavia
+    - name: Create load-balancer_member role
+      openstack.cloud.identity_role:
+        cloud: admin
+        name: load-balancer_member
+      tags:
+        - octavia
+
+    - name: Create octavia keypair
+      openstack.cloud.keypair:
+        cloud: octavia
+        name: octavia
+        public_key: "{{ octavia_amp_ssh_key.public_key }}"
+      tags:
+        - octavia
+
+    - name: Create flavor for Octavia amphora
+      openstack.cloud.os_nova_flavor:
+        cloud: octavia
+        name: octavia
+        flavorid: octavia
+        ram: 512
+        vcpus: 1
+        disk: 2
+        ephemeral: 2
+        is_public: false
+      tags:
+        - flavors
+        - octavia
+
+    - name: Create flavor 1C-256MB-1GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 1C-256MB-1GB
+        ram: 256
+        vcpus: 1
+        disk: 1
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 1C-256MB-1GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 1C-256MB-1GB
+        ram: 256
+        vcpus: 1
+        disk: 1
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 1C-512MB-1GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 1C-512MB-1GB
+        ram: 512
+        vcpus: 1
+        disk: 1
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 1C-512MB-5GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 1C-512MB-5GB
+        ram: 512
+        vcpus: 1
+        disk: 5
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 1C-1GB-5GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 1C-1GB-5GB
+        ram: 1024
+        vcpus: 1
+        disk: 5
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 1C-1GB-10GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 1C-1GB-10GB
+        ram: 1024
+        vcpus: 1
+        disk: 10
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 1C-1GB-20GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 1C-1GB-20GB
+        ram: 1024
+        vcpus: 1
+        disk: 20
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-1GB-10GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-1GB-10GB
+        ram: 1024
+        vcpus: 2
+        disk: 10
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-1GB-20GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-1GB-20GB
+        ram: 1024
+        vcpus: 2
+        disk: 20
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-2GB-10GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-2GB-10GB
+        ram: 2048
+        vcpus: 2
+        disk: 10
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-2GB-20GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-2GB-20GB
+        ram: 2048
+        vcpus: 2
+        disk: 20
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-4GB-10GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-4GB-10GB
+        ram: 4096
+        vcpus: 2
+        disk: 10
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-4GB-20GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-4GB-20GB
+        ram: 4096
+        vcpus: 2
+        disk: 20
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-8GB-10GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-8GB-10GB
+        ram: 8192
+        vcpus: 2
+        disk: 10
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-8GB-20GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-8GB-20GB
+        ram: 8192
+        vcpus: 2
+        disk: 20
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-16GB-10GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-16GB-10GB
+        ram: 16384
+        vcpus: 2
+        disk: 10
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Create flavor 2C-16GB-20GB
+      openstack.cloud.os_nova_flavor:
+        cloud: admin
+        name: 2C-16GB-20GB
+        ram: 16384
+        vcpus: 2
+        disk: 20
+        ephemeral: 0
+      tags:
+        - flavors
+
+    - name: Download cirros image
+      get_url:
+        url: >
+          https://github.com/cirros-dev/cirros/releases/download/0.5.1/cirros-0.5.1-x86_64-disk.img
+        dest: /share/cirros-0.5.1-x86_64-disk.img
+      tags:
+        - images
+        - images-cirros
+
+    - name: Upload cirros image
+      openstack.cloud.image:
+        cloud: admin
+        name: cirros
+        min_disk: 1
+        is_public: true
+        filename: /share/cirros-0.5.1-x86_64-disk.img
+        properties:
+          architecture: x86_64
+          os_type: linux
+      tags:
+        - images
+        - images-cirros
+
+    - name: Download Ubuntu 20.04 image
+      get_url:
+        url: >
+          https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
+        dest: /share/ubuntu-20.04-cloudimg-amd64.img
+      tags:
+        - images
+        - images-ubuntu
+
+    - name: Upload Ubuntu 20.04 image
+      openstack.cloud.image:
+        cloud: admin
+        name: "Ubuntu 20.04"
+        min_disk: 1
+        is_public: true
+        filename: /share/ubuntu-20.04-cloudimg-amd64.img
+        properties:
+          architecture: x86_64
+          os_type: linux
+      tags:
+        - images
+        - images-ubuntu
+
+    - name: Download amphora image
+      get_url:
+        url: >-
+          https://minio.services.osism.tech/openstack-octavia-amphora-image/octavia-amphora-haproxy-wallaby.qcow2
+        dest: /share/octavia-amphora-haproxy-wallaby.qcow2
+      tags:
+        - octavia
+
+    - name: Upload amphora image
+      openstack.cloud.image:
+        cloud: octavia
+        name: amphora-x64-haproxy
+        filename: /share/octavia-amphora-haproxy-wallaby.qcow2
+        properties:
+          architecture: x86_64
+          os_type: linux
+        tags:
+          - amphora
+          - wallaby
+      tags:
+        - octavia

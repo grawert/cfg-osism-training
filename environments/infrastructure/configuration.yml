@@ -1,0 +1,12 @@
+---
+##########################
+# netbox
+
+netbox_host: "{{ hostvars[inventory_hostname]['ansible_' + internal_interface]['ipv4']['address'] }}"
+##########################
+# cephclient
+
+cephclient_mons:
+  - 10.105.1.11
+  - 10.105.1.12
+  - 10.105.1.13

@@ -1,0 +1,7 @@
+.venv
+*.swp
+Pipfile.lock
+id_rsa.operator
+roles
+secure.yml
+tmp-from-image-mirror

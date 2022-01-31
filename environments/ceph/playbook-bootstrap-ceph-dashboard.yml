@@ -1,0 +1,73 @@
+---
+- name: Bootstraph ceph dashboard
+  hosts: manager
+  gather_facts: false
+  vars:
+    dashboard_port: 8080
+    dashboard_admin_username: admin
+    dashboard_admin_password: admin
+
+  tasks:
+    # NOTE: disable and re-enable the dashboard to trigger a restart of the dashboard
+    - name: Disable the ceph dashboard
+      command: ceph mgr module disable dashboard  # noqa 301
+      environment:
+        INTERACTIVE: false
+
+    - name: Set mgr/dashboard/ssl to false
+      command: ceph config set mgr mgr/dashboard/ssl false  # noqa 301
+      environment:
+        INTERACTIVE: false
+
+    - name: Set mgr/dashboard/server_port to "{{ dashboard_port }}"
+      command: ceph config set mgr mgr/dashboard/server_port "{{ dashboard_port }}"  # noqa 301
+      environment:
+        INTERACTIVE: false
+
+    - name: Enable the ceph dashboard
+      command: ceph mgr module enable dashboard  # noqa 301
+      environment:
+        INTERACTIVE: false
+
+    - name: Create temporary file for dashboard_admin_password
+      ansible.builtin.tempfile:
+        path: /opt/cephclient/data
+        state: file
+        suffix: temp
+      register: tempfile
+
+    - name: Include environments/ceph/secrets.yml
+      include_vars:
+        file: /opt/configuration/environments/ceph/secrets.yml
+
+    - name: Write dashboard_admin_password to temporary file
+      ansible.builtin.copy:
+        content: "{{ dashboard_admin_password }}"
+        dest: "{{ tempfile.path }}"
+      no_log: true
+
+    - name: Create admin user
+      command: "ceph dashboard ac-user-create {{ dashboard_admin_username }} administrator -i /data/{{ tempfile.path|basename }}"  # noqa 301
+      register: result
+      changed_when: "'already exists' not in result.stderr"
+      failed_when: ( result.rc not in [ 0, 17 ] )
+      environment:
+        INTERACTIVE: false
+
+    - name: Remove temporary file for dashboard_admin_password
+      ansible.builtin.file:
+        path: "{{ tempfile.path }}"
+        state: absent
+      when: tempfile.path is defined
+
+- name: Restart ceph manager services
+  hosts: ceph-mon
+  gather_facts: false
+  serial: 1
+
+  tasks:
+    - name: Restart ceph manager service
+      service:
+        name: "ceph-mgr@{{ inventory_hostname_short }}"
+        state: restarted
+      become: true

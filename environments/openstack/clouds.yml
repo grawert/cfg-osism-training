@@ -1,0 +1,12 @@
+---
+clouds:
+  admin:
+    auth:
+      username: admin
+      password: OQwQJKorXeQaO1wP8eHPELdq1x0UsunW5KFXsCc8
+      project_name: admin
+      auth_url: http://api-int.osism.training:5000/v3
+      project_domain_name: default
+      user_domain_name: default
+    identity_api_version: 3
+    endpoint_type: internalURL

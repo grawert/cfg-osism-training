@@ -1,0 +1,132 @@
+---
+
+###
+# The project name is passed as variable
+# example: osism-run openstack bootstrap-project -e "project_name=new_project" -e "domain_id=default" -e "description='New Project'"
+
+- name: Create/Setup Project
+  hosts: localhost
+  connection: local
+  vars:
+    create_project_network: true
+    domain_id: "default"
+    description: ""
+    external_network_name: external
+    project_network_cidr: 192.168.99.0/24
+    quota_instances: 50
+    quota_cores: 100
+    quota_ram: 104857600  # 100 GiB
+    quota_networks: 20
+    quota_subnets: 20
+    quota_subnetpools: 20
+    quota_ports: 200
+    quota_routers: 10
+    quota_fixed_ips: 100
+    quota_floating_ips: 10
+    quota_loadbalancers: 5
+    quota_loadbalancer_pools: 20
+    quota_security_groups: 20
+    quota_security_group_rules: 100
+    quota_volumes: 20
+    quota_snapshots: 20
+    quota_volume_gigabytes: 100
+    quota_per_volume_gigabytes: 100
+    quota_backup_gigabytes: 100
+
+  tasks:
+    - name: Fail if project name is undefined
+      ansible.builtin.fail:
+        msg: >
+          Variable 'project_name' is not defined! Define the project name using
+          Ansible command line argument
+          '--extra-vars project_name=NEW_PROJECT_NAME'."
+      when: project_name is undefined
+
+    - name: Create project
+      openstack.cloud.project:
+        cloud: admin
+        name: "{{ project_name }}"
+        domain_id: "{{ domain_id }}"
+        description: "{{ description }}"
+
+    - name: Set project quotas
+      openstack.cloud.quota:
+        cloud: admin
+        name: "{{ project_name }}"
+        instances: "{{ quota_instances }}"
+        cores: "{{ quota_cores }}"
+        ram: "{{ quota_ram }}"
+        network: "{{ quota_networks }}"
+        subnet: "{{ quota_subnets }}"
+        subnetpool: "{{ quota_subnetpools }}"
+        port: "{{ quota_ports }}"
+        router: "{{ quota_routers }}"
+        fixed_ips: "{{ quota_fixed_ips }}"
+        floating_ips: "{{ quota_floating_ips }}"
+        floatingip: "{{ quota_floating_ips }}"
+        loadbalancer: "{{ quota_loadbalancers }}"
+        pool: "{{ quota_loadbalancer_pools }}"
+        security_group: "{{ quota_security_groups }}"
+        security_group_rule: "{{ quota_security_group_rules }}"
+        volumes: "{{ quota_volumes }}"
+        snapshots: "{{ quota_snapshots }}"
+        gigabytes: "{{ quota_volume_gigabytes }}"
+        per_volume_gigabytes: "{{ quota_per_volume_gigabytes }}"
+        backup_gigabytes: "{{ quota_backup_gigabytes }}"
+
+    - name: Create ssh security group
+      openstack.cloud.security_group:
+        cloud: admin
+        project: "{{ project_name }}"
+        name: ssh
+
+    - name: Add rule to ssh security group
+      openstack.cloud.security_group_rule:
+        cloud: admin
+        project: "{{ project_name }}"
+        security_group: ssh
+        protocol: tcp
+        port_range_min: 22
+        port_range_max: 22
+        remote_ip_prefix: 0.0.0.0/0
+
+    - name: Create icmp security group
+      openstack.cloud.security_group:
+        cloud: admin
+        project: "{{ project_name }}"
+        name: icmp
+
+    - name: Add rule to icmp security group
+      openstack.cloud.security_group_rule:
+        cloud: admin
+        project: "{{ project_name }}"
+        security_group: icmp
+        protocol: icmp
+        remote_ip_prefix: 0.0.0.0/0
+
+    - name: Create project network
+      openstack.cloud.network:
+        cloud: admin
+        project: "{{ project_name }}"
+        name: "{{ project_name }}"
+      when: "{{ create_project_network | bool }}"
+
+    - name: Create project subnet
+      openstack.cloud.subnet:
+        cloud: admin
+        project: "{{ project_name }}"
+        name: "{{ project_name }}"
+        network_name: "{{ project_name }}"
+        cidr: "{{ project_network_cidr }}"
+      when: "{{ create_project_network | bool }}"
+
+    - name: Create project router to external network
+      openstack.cloud.router:
+        cloud: admin
+        project: "{{ project_name }}"
+        name: "{{ external_network_name }}"
+        network: "{{ external_network_name }}"
+        enable_snat: true
+        interfaces:
+          - "{{ project_name }}"
+      when: "{{ create_project_network | bool }}"

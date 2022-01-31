@@ -1,0 +1,63 @@
+---
+##########################################################
+# ansible
+
+# NOTE: Address where the node can be reached via SSH.
+ansible_host: 10.105.1.11
+
+##########################################################
+# generic
+
+# NOTE: Interface where the node can be reached via SSH.
+console_interface: ens3
+
+# NOTE: The internal interface for the internal communication.
+management_interface: ens3
+
+# NOTE: The address of the internal interface.
+internal_address: 10.105.1.11
+
+##########################################################
+# netdata
+
+netdata_host_type: client
+
+# NOTE: Uncomment this when this node should be a Netdata server.
+
+# netdata_host_type: server
+
+##########################################################
+# network-interfaces
+
+network_interfaces: {}
+
+##########################################################
+# kolla
+
+network_interface: ens3
+
+# api_interface:
+# bifrost_network_interface:
+# dns_interface:
+kolla_external_vip_interface: ens4
+# migration_interface:
+neutron_external_interface: ens5
+# octavia_network_interface:
+# storage_interface:
+# tunnel_interface:
+
+##########################################################
+# ceph
+
+# NOTE: Uncomment this when this node is a part of the Ceph cluster.
+
+# monitor_address:
+# radosgw_address:
+
+# monitor_interface:
+# radosgw_interface:
+
+# NOTE: Uncomment this when this node should be a OSD node.
+
+devices:
+  - /dev/sdc

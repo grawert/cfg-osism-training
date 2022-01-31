@@ -1,0 +1,5 @@
+---
+##########################
+# patchman-client
+
+patchman_client_host: "{{ hostvars['manager01.osism.training']['ansible_' + hostvars['manager01.osism.training']['management_interface']]['ipv4']['address'] }}"
