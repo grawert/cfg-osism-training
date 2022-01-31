@@ -8,6 +8,8 @@ ansible_host: 10.105.1.13
 ##########################################################
 # generic
 
+internal_interface: ens3
+
 # NOTE: Interface where the node can be reached via SSH.
 console_interface: ens3
 
