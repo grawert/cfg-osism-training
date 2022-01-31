@@ -53,8 +53,8 @@ neutron_external_interface: ens5
 
 # NOTE: Uncomment this when this node is a part of the Ceph cluster.
 
-# monitor_address:
-# radosgw_address:
+monitor_address: 10.105.1.13
+radosgw_address: 10.105.1.13
 
 # monitor_interface:
 # radosgw_interface:
