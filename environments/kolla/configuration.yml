@@ -16,6 +16,7 @@ kolla_external_fqdn: api.osism.training
 # enable services
 enable_cinder: "yes"
 enable_cinder_backup: "yes"
+enable_designate: "yes"
 
 enable_grafana: "yes"
 enable_prometheus: "yes"
@@ -29,7 +30,6 @@ enable_heat: "no"
 enable_aodh: "no"
 enable_barbican: "no"
 enable_ceilometer: "no"
-enable_designate: "no"
 enable_gnocchi: "no"
 enable_magnum: "no"
 enable_panko: "no"
@@ -85,7 +85,7 @@ ceilometer_database_type: gnocchi
 ceilometer_event_type: panko
 
 # designate
-designate_ns_record: openstack.osism.training
+designate_ns_record: "osism.training"
 
 ##########################################################
 # external ceph
